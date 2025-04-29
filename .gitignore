@@ -1,0 +1,10 @@
+# Ignore virtual environment directories
+app_env/
+
+# Ignore Python cache files
+*/__pycache__/
+
+# Ignore environment variables file
+env
+
+.DS_Store
