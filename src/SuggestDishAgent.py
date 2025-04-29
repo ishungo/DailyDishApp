@@ -159,7 +159,8 @@ def simple_chat(llm, messages):
 if __name__ == '__main__':
     # messages = [HumanMessage("データを見せて")]
     # messages = [HumanMessage("はじめまして")]
-    messages = [HumanMessage("昨日は赤から鍋を食べた")]
+    # messages = [HumanMessage("昨日は赤から鍋を食べた")]
+    messages = [HumanMessage("レシピを考えて")]
 
     ret = ""
     for chunk in process_request(messages):
