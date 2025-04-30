@@ -1,7 +1,8 @@
 """ 標準ライブラリのimport """
 from typing import List
 from pprint import pprint
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 
 """ langchain """
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
@@ -37,8 +38,10 @@ def request_classifier(llm: ChatOpenAI, messages: List[BaseMessage]) -> str:
     以下の会話からユーザのリクエストを分類してください。
     1. 冷蔵庫の食材、食べた料理名を保存しているデータベースへの登録や内容の更新
     2. 冷蔵庫の食材、食べた料理を保存しているデータベースの確認
-    3. 食べたい料理のリクエスト
-    4. その他
+    3. 食べたい料理の提案
+    4. レシートの画像から購入した食材の抽出
+    5. 料理の画像から料理名の取得
+    6. その他の会話を行う
     {format_instructions}
     """
     system = SystemMessage(system_template)
@@ -62,6 +65,10 @@ def process_request(messages: List[BaseMessage]):
     elif classification == 3:
         response = today_dish_suggestion(llm, messages)
     elif classification == 4:
+        response = process_receipt_image(llm, messages)
+    elif classification == 5:
+        response = process_dish_image(llm, messages)
+    elif classification == 6:
         response = simple_chat(llm, messages)
     else:
         response = "内部での処理に失敗しました。"
@@ -69,7 +76,6 @@ def process_request(messages: List[BaseMessage]):
     # return response
     for text in response:
         yield text
-
 
 
 # DB更新リクエストの処理
@@ -84,22 +90,22 @@ def process_db_update_request(llm: ChatOpenAI, messages: List[BaseMessage]):
         tools = [add_grocery_to_list, remove_grocery_from_list, add_dish_list, remove_dish_list]
         llm_with_tools = llm.bind_tools(tools)
         chain = llm_with_tools | PydanticToolsParser(tools=tools)
-        chain.invoke(messages)
+        result = chain.invoke(messages)
         status = True
     except Exception as e:
         error_message = f"エラーが発生しました: {e}"
         status = False
 
-    db_info = '\n'.join([show_dish(), show_grocery()])
+    db_info = '\n'.join([show_grocery(), show_dish()])
 
     if status:
-        return f"データベースの更新が完了しました\n\n{db_info}"
+        return '\n'.join(result) + f"\n[データベースの更新が完了しました]\n\n{db_info}"
     else:
         return f"データベースの更新に失敗しました\n{error_message}\n\n{db_info}"
 
 # DB表示リクエストの処理
 def process_db_show_request(llm, messages):
-    tools = [show_dish, show_grocery]
+    tools = [show_grocery, show_dish]
     llm_with_tools = llm.bind_tools(tools)
     chain = llm_with_tools | PydanticToolsParser(tools=tools)
     responses = chain.invoke(messages)
@@ -117,9 +123,11 @@ def show_grocery():
 
 def show_dish():
     """ 直近食べた料理を表示する """
+    from_date = (datetime.now() - timedelta(days=31)).strftime('%Y-%m-%d')
     dish_list = load_dish_list()
-    response = "### 直近食べた料理:"
+    response = "### 1ヶ月以内に食べた料理:"
     for date, dishes in sorted(dish_list.items()):
+        if date < from_date: continue
         response += f"\n{date}:"
         for dish in dishes:
             response += f" {dish}"
@@ -149,6 +157,31 @@ def today_dish_suggestion(llm, messages):
     response = chain.stream(messages)
     return response
 
+
+def process_receipt_image(llm, messages):
+    system_tmpplate = """
+    画像のレシートを読み取り、食材をリストアップしてください。
+    最後にこれらを冷蔵庫の中身データベースに追加するかをユーザに尋ねてください。
+    """
+    system = SystemMessage(system_tmpplate)
+    messages = [system] + messages
+    chain = llm | StrOutputParser()
+    response = chain.stream(messages)
+    return response
+
+def process_dish_image(llm, messages):
+    system_tmpplate = """
+    画像の料理を読み取り、料理名をリストアップしてください。
+    最後にこれらを料理データベースに追加するかをユーザに尋ねてください。
+    """
+    system = SystemMessage(system_tmpplate)
+    messages = [system] + messages
+    chain = llm | StrOutputParser()
+    response = chain.stream(messages)
+    return response
+
+
+
 def simple_chat(llm, messages):
     chain = llm | StrOutputParser()
     response = chain.stream(messages, stream=True)
@@ -159,8 +192,9 @@ def simple_chat(llm, messages):
 if __name__ == '__main__':
     # messages = [HumanMessage("データを見せて")]
     # messages = [HumanMessage("はじめまして")]
-    # messages = [HumanMessage("昨日は赤から鍋を食べた")]
+    # messages = [HumanMessage("3/31は麻婆豆腐を食べた.冷蔵庫の中身にりんごとバナナを追加して.ぶどうを削除して")]
     messages = [HumanMessage("レシピを考えて")]
+
 
     ret = ""
     for chunk in process_request(messages):

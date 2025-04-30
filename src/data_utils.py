@@ -40,6 +40,7 @@ def add_grocery_to_list(grocery: str):
     grocery_list.add(grocery)
     # 保存
     save_grocery(grocery_list)
+    return f"{grocery}を冷蔵庫のリストに追加しました"
 
 
 def remove_grocery_from_list(grocery: str):
@@ -51,6 +52,7 @@ def remove_grocery_from_list(grocery: str):
         grocery_list.remove(grocery)
     # 保存
     save_grocery(grocery_list)
+    return f"{grocery}を冷蔵庫のリストから削除しました"
 
 
 def load_dish_list() -> dict:
@@ -87,6 +89,7 @@ def add_dish_list(dish: str, days_ago: int = 0):
     else:
         dish_list[date_str].add(dish)
     save_dish_list(dish_list)
+    return f"{date_str}に{dish}を追加しました"
 
 
 def remove_dish_list(dish: str, days_ago: int = 0):
@@ -100,6 +103,7 @@ def remove_dish_list(dish: str, days_ago: int = 0):
     if date_str in dish_list and dish in dish_list[date_str]:
         dish_list[date_str].remove(dish)
     save_dish_list(dish_list)
+    return f"{date_str}の{dish}を削除しました"
 
 
 if __name__ == '__main__':
